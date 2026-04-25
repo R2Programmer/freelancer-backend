@@ -23,6 +23,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Prisma generate only needs the schema, not a real DB connection.
+# Set a placeholder so env() references in prisma.config.ts don't throw.
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+ENV DIRECT_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+
 RUN npx prisma generate
 RUN npm run build
 
@@ -42,6 +47,9 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+ENV DIRECT_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN npx prisma generate
 
 EXPOSE 3001
