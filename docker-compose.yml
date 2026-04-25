@@ -1,0 +1,91 @@
+name: freelancer-os
+
+# Development — bind-mounted source, hot reload
+#
+# Expected folder layout (both repos cloned as siblings):
+#   your-folder/
+#   ├── freelancer-backend/   ← this repo (run compose from here)
+#   └── freelancer-frontend/  ← sibling clone
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up --build
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: fos_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB:       ${POSTGRES_DB:-freelancer_os}
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # NestJS Backend
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: fos_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-freelancer_os}?schema=public
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - '3001:3001'
+    volumes:
+      - .:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "npx prisma generate &&
+             npx prisma migrate deploy &&
+             npm run start:dev"
+
+  # ---------------------------------------------------------------------------
+  # Next.js Frontend
+  # Cloned as a sibling directory: ../freelancer-frontend
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ../freelancer-frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: fos_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api
+    ports:
+      - '3000:3000'
+    volumes:
+      - ../freelancer-frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  backend_node_modules:
+  frontend_node_modules:
+  frontend_next_cache:

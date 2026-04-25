@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+test/
+.git/
+.gitignore
+*.md
+.env
+.env.*
+.nyc_output/

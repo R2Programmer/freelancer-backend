@@ -1,0 +1,73 @@
+name: freelancer-os-prod
+
+# Production — pulls pre-built images from GitHub Container Registry.
+# Each repo builds and pushes its own image via GitHub Actions.
+#
+# Images:
+#   Backend:  ghcr.io/YOUR_GITHUB_USERNAME/freelancer-backend:latest
+#   Frontend: ghcr.io/YOUR_GITHUB_USERNAME/freelancer-frontend:latest
+#
+# Usage:
+#   cp .env.example .env.production
+#   # Fill in real values in .env.production
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: fos_db
+    restart: always
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB:       ${POSTGRES_DB:-freelancer_os}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # NestJS Backend — pre-built image from GHCR
+  # ---------------------------------------------------------------------------
+  backend:
+    image: ${BACKEND_IMAGE:?required}
+    # e.g. ghcr.io/your-github-username/freelancer-backend:latest
+    container_name: fos_backend
+    restart: always
+    environment:
+      NODE_ENV:       production
+      DATABASE_URL:   postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-freelancer_os}?schema=public
+      JWT_SECRET:     ${JWT_SECRET:?required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      PORT:           3001
+      FRONTEND_URL:   ${FRONTEND_URL:?required}
+    ports:
+      - '3001:3001'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Next.js Frontend — pre-built image from GHCR
+  # NEXT_PUBLIC_API_URL is baked into the image at build time (GitHub Actions)
+  # ---------------------------------------------------------------------------
+  frontend:
+    image: ${FRONTEND_IMAGE:?required}
+    # e.g. ghcr.io/your-github-username/freelancer-frontend:latest
+    container_name: fos_frontend
+    restart: always
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
