@@ -87,4 +87,4 @@ USER nestjs
 EXPOSE 3001
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]
