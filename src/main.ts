@@ -18,8 +18,11 @@ async function bootstrap() {
 
   app.useGlobalFilters(new PrismaExceptionFilter());
 
+  const rawOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const origin = rawOrigin.startsWith('http') ? rawOrigin : `https://${rawOrigin}`;
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin,
     credentials: true,
   });
 
